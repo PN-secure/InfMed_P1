@@ -1,8 +1,5 @@
 import numpy as np
 
-import numpy as np
-
-
 def radon_transform(image, angles):
     height, width = image.shape
 
@@ -36,3 +33,31 @@ def radon_transform(image, angles):
                     sinogram[t_idx, a_idx] += image[y, x]
 
     return sinogram
+
+# funkcja kernela do filtru - można uprościć
+def kernel(size):
+    h = np.zeros(size)
+    center = size // 2
+
+    for i in range(size):
+        k = i - center
+
+        if k == 0:
+            h[i] = 1
+        elif k % 2 == 0:
+            h[i] = 0
+        else:
+            h[i] = -4 / (np.pi**2 * k**2)
+    
+    h = h / np.sum(np.abs(h))
+    return h
+        
+def filter(sinogram):
+    h = kernel(21)
+    sinogram /= np.max(sinogram)
+    filtered = np.zeros_like(sinogram)
+
+    for i in range(sinogram.shape[1]):
+        filtered[:, i] = np.convolve(sinogram[:, i], h, mode="same")
+
+    return filtered
