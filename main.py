@@ -17,7 +17,7 @@ def main():
     x = radon_transform(img_bitmap, np.linspace(0,180,180))
     plt.imshow(x, cmap="gray", aspect="auto") # sinogram nieprzefiltrowany
     plt.subplot(1,4,3)
-    fil = filter(x)
+    fil = filter_s(x)
     plt.imshow(fil, cmap="gray", aspect="auto") # sinogram przefiltrowany
     rec = backprojection(fil, np.linspace(0,180,180), img_bitmap.shape)
     plt.subplot(1,4,4)

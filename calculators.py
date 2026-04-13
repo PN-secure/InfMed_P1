@@ -52,7 +52,7 @@ def kernel(size):
     h = h / np.sum(np.abs(h))
     return h
         
-def filter(sinogram):
+def filter_s(sinogram):
     h = kernel(21)
     sinogram /= np.max(sinogram)
     filtered = np.zeros_like(sinogram)
