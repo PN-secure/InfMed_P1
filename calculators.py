@@ -69,25 +69,27 @@ def backprojection(sinogram, angles, output_size):
     recon = np.zeros((height, width))
     cx, cy = width // 2, height // 2
 
+    X, Y = np.meshgrid(np.arange(width), np.arange(height))
+
+    X = X - cx
+    Y = Y - cy
+
     for a_idx, theta in enumerate(angles):
-        theta_rad = np.deg2rad(theta)
-        cos_t = np.cos(theta_rad)
-        sin_t = np.sin(theta_rad)
+        t = (X * np.cos(np.deg2rad(theta)) +
+             Y * np.sin(np.deg2rad(theta)))
 
-        for y in range(height):
-            for x in range(width):
-                x_shift = x - cx
-                y_shift = y - cy
+        t_idx = t + diag // 2
 
-                t = int(x_shift * cos_t + y_shift * sin_t)
-                t_idx = t + diag // 2
+        t0 = np.floor(t_idx).astype(int)
+        t1 = t0 + 1
 
-                t0 = int(np.floor(t_idx))
-                t1 = t0 + 1
-                if 0 <= t0 < diag-1:
-                    alpha = t_idx - t0
-                    recon[y, x] += (1-alpha) * sinogram[t0, a_idx] + alpha * sinogram[t1, a_idx]
+        valid = (t0 >= 0) & (t1 < diag)
 
-    recon /= len(angles)
+        alpha = t_idx - t0
 
-    return recon
+        recon[valid] += (
+            (1 - alpha[valid]) * sinogram[t0[valid], a_idx] +
+            alpha[valid] * sinogram[t1[valid], a_idx]
+        )
+
+    return recon / len(angles)
