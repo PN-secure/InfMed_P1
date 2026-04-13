@@ -61,3 +61,33 @@ def filter(sinogram):
         filtered[:, i] = np.convolve(sinogram[:, i], h, mode="same")
 
     return filtered
+
+def backprojection(sinogram, angles, output_size):
+    height, width = output_size
+    diag = sinogram.shape[0]
+
+    recon = np.zeros((height, width))
+    cx, cy = width // 2, height // 2
+
+    for a_idx, theta in enumerate(angles):
+        theta_rad = np.deg2rad(theta)
+        cos_t = np.cos(theta_rad)
+        sin_t = np.sin(theta_rad)
+
+        for y in range(height):
+            for x in range(width):
+                x_shift = x - cx
+                y_shift = y - cy
+
+                t = int(x_shift * cos_t + y_shift * sin_t)
+                t_idx = t + diag // 2
+
+                t0 = int(np.floor(t_idx))
+                t1 = t0 + 1
+                if 0 <= t0 < diag-1:
+                    alpha = t_idx - t0
+                    recon[y, x] += (1-alpha) * sinogram[t0, a_idx] + alpha * sinogram[t1, a_idx]
+
+    recon /= len(angles)
+
+    return recon
