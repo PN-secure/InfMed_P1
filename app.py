@@ -12,7 +12,7 @@ from PIL import Image
 from calculators import *
 
 class Worker(QThread):
-    finished = pyqtSignal(object, object, object, object, object)
+    finished = pyqtSignal(object, object, object, object, object, object)
 
     def run(self):
         img = Image.open(sys.argv[1]).convert("L")
@@ -20,11 +20,20 @@ class Worker(QThread):
 
         angles = np.linspace(0, 180, 180, endpoint=False)
 
-        x = radon_transform(img, angles)
-        fil = filter_s(x)
-        rec = backprojection(fil, angles, img.shape)
+        sinogram = radon_transform(img, angles)
+        filtered = filter_s(sinogram)
 
-        self.finished.emit(img, x, fil, angles, img.shape)
+        reconstructions = []
+
+        for i in range(1, len(angles)+1):
+            rec = backprojection(
+                filtered[:, :i],
+                angles[:i],
+                img.shape
+            )
+            reconstructions.append(rec)
+
+        self.finished.emit(img, sinogram, filtered, angles, img.shape, reconstructions)
 
 class App(QMainWindow):
 
@@ -45,10 +54,6 @@ class App(QMainWindow):
         self.ax3 = self.fig.add_subplot(1,4,3)
         self.ax4 = self.fig.add_subplot(1,4,4)
 
-        self.timer = QTimer()
-        self.timer.setSingleShot(True)
-        self.timer.timeout.connect(self._update_delayed)
-
         layout = QVBoxLayout()
         layout.addLayout(self.radio_layout) # dodanie przyciskow trybiu
         layout.addWidget(self.slider)
@@ -64,25 +69,22 @@ class App(QMainWindow):
 
     def start(self):
         self.btn.setEnabled(False)
-        #if self.iter_b.isChecked():
-        #    self.btn.setEnabled(False)
-        #else:
         self.worker = Worker()
         self.worker.finished.connect(self.update_plot)
         self.worker.start()
     
     def update_iter_plot(self, value):
-        if value == 0:
+        if not hasattr(self, "reconstructions"):
             return
-        
-        partial_angles = self.angles[:value]
-        partial_sinogram = self.filtered[:, :value]
-        
-        self._pending_angles = partial_angles
-        self._pending_sinogram = partial_sinogram
 
-        self.timer.start(50)
-        
+        rec = self.reconstructions[value - 1]
+
+        self.draw_all(
+            self.img,
+            self.sinogram[:, :value],
+            self.filtered[:, :value],
+            rec
+        )
     def draw_all(self, img, x, fil, rec):
         
         self.ax1.clear()
@@ -102,7 +104,7 @@ class App(QMainWindow):
         self.ax4.imshow(rec, cmap="gray")
         self.ax4.set_title("Backprojection")
 
-        self.canvas.draw_idle()
+        self.canvas.draw()
 
         self.btn.setEnabled(True)
     
@@ -128,35 +130,14 @@ class App(QMainWindow):
 
     def create_slider(self): # utworzenie suwaka
         self.slider = QSlider(Qt.Orientation.Horizontal)
-        self.slider.setMinimum(0)
+        self.slider.setMinimum(1)
         self.slider.setMaximum(100)
         self.slider.blockSignals(True)
         self.slider.setValue(1)
         self.slider.blockSignals(False)
-        self.slider.valueChanged.connect(self.schedule_update)
+        self.slider.valueChanged.connect(self.update_iter_plot)
         self.slider.hide()
         self.slider.setMaximumSize(150,50)
-
-    def schedule_update(self, value):
-        self._pending_value = value
-        self.timer.start(80)
-
-    def _update_delayed(self):
-        if not hasattr(self, "_pending_angles"):
-            return
-
-        rec = backprojection(
-            self._pending_sinogram,
-            self._pending_angles,
-            self.shape
-        )
-
-        self.draw_all(
-            self.img,
-            self.sinogram[:, :len(self._pending_angles)],
-            self._pending_sinogram,
-            rec
-        )
 
     def toggle_slider(self, checked): # ukrycie lub wyświetlenie suwaka
         if checked:
@@ -164,23 +145,22 @@ class App(QMainWindow):
         else:
             self.slider.hide()
 
-    def update_plot(self, img, sinogram, filtered, angles, shape):
+    def update_plot(self, img, sinogram, filtered, angles, shape, reconstructions):
         self.img = img
         self.sinogram = sinogram
         self.filtered = filtered
         self.angles = angles
         self.shape = shape
-        
+        self.reconstructions = reconstructions
+
         self.slider.setMaximum(len(angles))
-        self.slider.setEnabled(True)
 
         if self.iter_b.isChecked():
             self.slider.setEnabled(True)
             self.update_iter_plot(self.slider.value())
         else:
             self.slider.setEnabled(False)
-            rec = backprojection(filtered, angles, shape)
-            self.draw_all(img, sinogram, filtered, rec)
+            self.draw_all(img, sinogram, filtered, reconstructions[-1])
 
         self.btn.setEnabled(True)
 

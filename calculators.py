@@ -1,36 +1,76 @@
 import numpy as np
 
+def bresenham(x0, y0, x1, y1):
+    points = []
+
+    dx = abs(x1 - x0)
+    dy = abs(y1 - y0)
+
+    sx = 1 if x0 < x1 else -1
+    sy = 1 if y0 < y1 else -1
+
+    err = dx - dy
+
+    while True:
+        points.append((x0, y0))
+
+        if x0 == x1 and y0 == y1:
+            break
+
+        e2 = 2 * err
+
+        if e2 > -dy:
+            err -= dy
+            x0 += sx
+
+        if e2 < dx:
+            err += dx
+            y0 += sy
+
+    return points
+
 def radon_transform(image, angles):
     height, width = image.shape
+    diag = int(np.sqrt(height**2 + width**2))
 
-    # przekątna = maksymalny zasięg
-    diag = int(np.sqrt(height ** 2 + width ** 2))
-
-    # sinogram
     sinogram = np.zeros((diag, len(angles)))
 
-    # środek obrazu
     cx, cy = width // 2, height // 2
 
     for a_idx, theta in enumerate(angles):
         theta_rad = np.deg2rad(theta)
-        cos_t = np.cos(theta_rad)
-        sin_t = np.sin(theta_rad)
 
-        for y in range(height):
-            for x in range(width):
+        # kierunek prostopadły (do przesuwania linii)
+        dx = np.cos(theta_rad) 
+        dy = np.sin(theta_rad)
 
-                # przesunięcie do środka
-                x_shift = x - cx
-                y_shift = y - cy
+        # wektor prostopadły do linii
+        nx = -dy
+        ny = dx
 
-                # obliczenie t
-                t = int(x_shift * cos_t + y_shift * sin_t)
+        for t_idx in range(-diag//2, diag//2):
 
-                t_idx = t + diag // 2
+            # punkt na linii
+            x0 = int(cx + t_idx * nx)
+            y0 = int(cy + t_idx * ny)
 
-                if 0 <= t_idx < diag:
-                    sinogram[t_idx, a_idx] += image[y, x]
+            # końce długiej linii (żeby przeciąć cały obraz)
+            x1 = int(x0 + 1000 * dx)
+            y1 = int(y0 + 1000 * dy)
+
+            x2 = int(x0 - 1000 * dx)
+            y2 = int(y0 - 1000 * dy)
+
+            # piksele na linii
+            line_points = bresenham(x1, y1, x2, y2)
+
+            sum_val = 0
+
+            for x, y in line_points:
+                if 0 <= x < width and 0 <= y < height:
+                    sum_val += image[y, x]
+
+            sinogram[t_idx + diag//2, a_idx] = sum_val
 
     return sinogram
 
@@ -75,8 +115,8 @@ def backprojection(sinogram, angles, output_size):
     Y = Y - cy
 
     for a_idx, theta in enumerate(angles):
-        t = (X * np.cos(np.deg2rad(theta)) +
-             Y * np.sin(np.deg2rad(theta)))
+        t = (X * np.sin(np.deg2rad(theta)) +
+             Y * np.cos(np.deg2rad(theta)))
 
         t_idx = t + diag // 2
 
