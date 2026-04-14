@@ -7,6 +7,7 @@ from matplotlib.figure import Figure
 
 import numpy as np
 import sys
+import pydicom
 from PIL import Image
 
 from calculators import *
@@ -15,8 +16,8 @@ class Worker(QThread):
     finished = pyqtSignal(object, object, object, object, object, object)
 
     def run(self):
-        img = Image.open(sys.argv[1]).convert("L")
-        img = np.array(img) / 255
+        path = sys.argv[1]
+        img = load_image(path)
 
         angles = np.linspace(0, 180, 180, endpoint=False)
 

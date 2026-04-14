@@ -1,4 +1,7 @@
 import numpy as np
+import os
+from PIL import Image
+import pydicom
 
 def bresenham(x0, y0, x1, y1):
     points = []
@@ -133,3 +136,23 @@ def backprojection(sinogram, angles, output_size):
         )
 
     return recon / len(angles)
+
+
+def load_image(path):
+    ext = os.path.splitext(path)[1].lower()
+
+    # --- DICOM ---
+    if ext == ".dcm":
+        ds = pydicom.dcmread(path)
+        img = ds.pixel_array.astype(np.float32)
+
+        # normalizacja
+        img -= img.min()
+        img /= (img.max() + 1e-8)
+        return img
+
+    # --- JPG / PNG ---
+    else:
+        img = Image.open(path).convert("L")
+        img = np.array(img).astype(np.float32) / 255.0
+        return img
