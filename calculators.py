@@ -32,11 +32,15 @@ def bresenham(x0, y0, x1, y1):
 
     return points
 
-def radon_transform(image, angles):
+def radon_transform(image, angles, n_detectors, detector_span):
     height, width = image.shape
-    diag = int(np.sqrt(height**2 + width**2))
+    n = n_detectors
 
-    sinogram = np.zeros((diag, len(angles)))
+    t_max = detector_span / 2
+
+    t_vals = np.linspace(-t_max, t_max, n)
+
+    sinogram = np.zeros((n, len(angles)))
 
     cx, cy = width // 2, height // 2
 
@@ -50,19 +54,18 @@ def radon_transform(image, angles):
         # wektor prostopadły do linii
         nx = -dy
         ny = dx
-
-        for t_idx in range(-diag//2, diag//2):
+        L = max(width, height) * 2
+        for t_idx, t in enumerate(t_vals):
 
             # punkt na linii
-            x0 = int(cx + t_idx * nx)
-            y0 = int(cy + t_idx * ny)
+            x0 = int(cx + t * nx)
+            y0 = int(cy + t * ny)
 
             # końce długiej linii (żeby przeciąć cały obraz)
-            x1 = int(x0 + 1000 * dx)
-            y1 = int(y0 + 1000 * dy)
-
-            x2 = int(x0 - 1000 * dx)
-            y2 = int(y0 - 1000 * dy)
+            x1 = int(x0 + L * dx)
+            y1 = int(y0 + L * dy)
+            x2 = int(x0 - L * dx)
+            y2 = int(y0 - L * dy)
 
             # piksele na linii
             line_points = bresenham(x1, y1, x2, y2)
@@ -73,7 +76,7 @@ def radon_transform(image, angles):
                 if 0 <= x < width and 0 <= y < height:
                     sum_val += image[y, x]
 
-            sinogram[t_idx + diag//2, a_idx] = sum_val
+            sinogram[t_idx, a_idx] = sum_val
 
     return sinogram
 

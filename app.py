@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QVBoxLayout, QWidget, QPushButton, QRadioButton, QButtonGroup, QSlider
+    QApplication, QMainWindow, QVBoxLayout, QWidget, QPushButton, QRadioButton, QButtonGroup, QSlider, QLabel
 )
 from PyQt6.QtCore import QThread, pyqtSignal, Qt, QCoreApplication, QTimer
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
@@ -15,13 +15,25 @@ from calculators import *
 class Worker(QThread):
     finished = pyqtSignal(object, object, object, object, object, object)
 
+    def __init__(self, delta_alpha, n_detectors, detector_span):
+        super().__init__()
+        self.delta_alpha = delta_alpha
+        self.n_detectors = n_detectors
+        self.detector_span = detector_span
+
     def run(self):
         path = sys.argv[1]
         img = load_image(path)
 
-        angles = np.linspace(0, 180, 180, endpoint=False)
+        angles = np.arange(0, 180, self.delta_alpha)
 
-        sinogram = radon_transform(img, angles)
+        sinogram = radon_transform(
+            img,
+            angles,
+            self.n_detectors,
+            self.detector_span
+        )
+        
         filtered = filter_s(sinogram)
 
         reconstructions = []
@@ -47,6 +59,7 @@ class App(QMainWindow):
         self.create_draw_button()
         self.create_radio_buttons()
         self.create_slider()
+        self.create_controls()
 
         self.fig = Figure(figsize=(10, 3))
         self.canvas = FigureCanvasQTAgg(self.fig)
@@ -59,6 +72,7 @@ class App(QMainWindow):
         layout.addLayout(self.radio_layout) # dodanie przyciskow trybiu
         layout.addWidget(self.slider)
         layout.addWidget(self.canvas) #dodanie wykresu
+        layout.addLayout(self.controls_layout)
         layout.addWidget(self.btn) #dodanie przycisku rysowania
         layout.insertWidget(0,self.btn)
         
@@ -70,7 +84,12 @@ class App(QMainWindow):
 
     def start(self):
         self.btn.setEnabled(False)
-        self.worker = Worker()
+
+        delta_alpha = self.delta_slider.value()
+        n_detectors = self.n_slider.value()
+        detector_span = self.l_slider.value()
+
+        self.worker = Worker(delta_alpha, n_detectors, detector_span)
         self.worker.finished.connect(self.update_plot)
         self.worker.start()
     
@@ -139,6 +158,50 @@ class App(QMainWindow):
         self.slider.valueChanged.connect(self.update_iter_plot)
         self.slider.hide()
         self.slider.setMaximumSize(150,50)
+
+    def create_controls(self):
+        layout = QVBoxLayout()
+
+        # delta alfa
+        self.delta_label = QLabel("Krok delta alfa: 1")
+        self.delta_slider = QSlider(Qt.Orientation.Horizontal)
+        self.delta_slider.setMinimum(1)
+        self.delta_slider.setMaximum(10)
+        self.delta_slider.setValue(1)
+        self.delta_slider.valueChanged.connect(
+            lambda v: self.delta_label.setText(f"Krok delta alfa: {v}")
+        )
+
+        # n
+        self.n_label = QLabel("Liczba detektorów (n): 180")
+        self.n_slider = QSlider(Qt.Orientation.Horizontal)
+        self.n_slider.setMinimum(10)
+        self.n_slider.setMaximum(300)
+        self.n_slider.setValue(180)
+        self.n_slider.valueChanged.connect(
+            lambda v: self.n_label.setText(f"Liczba detektorów (n): {v}")
+        )
+
+        # l
+        self.l_label = QLabel("Rozpiętość detektorów (l): 200")
+        self.l_slider = QSlider(Qt.Orientation.Horizontal)
+        self.l_slider.setMinimum(50)
+        self.l_slider.setMaximum(500)
+        self.l_slider.setValue(200)
+        self.l_slider.valueChanged.connect(
+            lambda v: self.l_label.setText(f"Rozpiętość detektorów (l): {v}")
+        )
+
+        layout.addWidget(self.delta_label)
+        layout.addWidget(self.delta_slider)
+
+        layout.addWidget(self.n_label)
+        layout.addWidget(self.n_slider)
+
+        layout.addWidget(self.l_label)
+        layout.addWidget(self.l_slider)
+
+        self.controls_layout = layout
 
     def toggle_slider(self, checked): # ukrycie lub wyświetlenie suwaka
         if checked:
